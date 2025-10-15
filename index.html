@@ -39,11 +39,13 @@
       background: rgba(10,14,26,0.8); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
     }
     .brand { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      width: 48px; height: 48px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), #00ff88);
-      display: grid; place-items: center; font-weight: 700; color: #000; font-size: 20px;
-      box-shadow: 0 8px 32px rgba(0,212,255,0.3);
-    }
+    .custom-logo {
+  width: 120px; height: 48px; object-fit: contain;
+  background: transparent;     
+  border-radius: 0;            
+  box-shadow: none;            
+}
+    
     .app-title { font-size: 1.2rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .app-sub { font-size: 0.8rem; color: var(--muted); }
     
@@ -96,13 +98,17 @@
     .input-group .btn { border-radius: 0 12px 12px 0; }
     
     /* Timer */
-    .timer-card {
-      background: linear-gradient(135deg, rgba(255,170,0,0.1), rgba(255,136,0,0.1));
-      border: 1px solid var(--warning); animation: pulse-timer 2s infinite;
-    }
-    @keyframes pulse-timer { 0%,100%{box-shadow:0 0 0 0 rgba(255,170,0,0.4)} 50%{box-shadow:0 0 0 12px rgba(255,170,0,0)} }
-    .timer-display { font-size: 1.5rem; font-weight: 700; color: var(--warning); }
-    
+  .timer-card {
+  background: linear-gradient(135deg, rgba(192,192,192,0.1), rgba(169,169,169,0.1));  
+  border: 1px solid #C0C0C0;  
+  animation: pulse-timer 2s infinite;
+}
+.timer-display { 
+  font-size: 1.5rem; font-weight: 700; color: #C0C0C0;  
+}
+@keyframes pulse-timer { 
+  0%,100%{box-shadow:0 0 0 0 rgba(192,192,192,0.4)} 50%{box-shadow:0 0 0 12px rgba(192,192,192,0)}  
+}
     /* Bottom Nav */
     .bottom-nav {
       position: relative; left: 50%; transform: translateX(-50%); bottom: 16px; width: calc(100% - 32px);
@@ -125,12 +131,8 @@
     <!-- Topbar -->
     <div class="topbar">
       <div class="brand">
-        <div class="logo">𝐀𝐗</div>
-        <div>
-          <div class="app-title">ASIAX PRO</div>
-          <p class="app-sub">Wealth Creation 2025</p>
+        <img src="prologo.png" class="custom-logo" alt="ASIAX PRO" />
         </div>
-      </div>
       <button id="connectBtn" class="btn btn-modern btn-primary pulse">
         <i class="fas fa-wallet"></i> <span id="connectLabel">Connect</span>
       </button>
@@ -598,3 +600,4 @@ function setupBottomNav() {
 </script>
 </body>
 </html>
+
