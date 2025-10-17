@@ -171,7 +171,7 @@
           <div class="stat-label">Total Income</div><div class="stat-value"><i class="fas fa-money-bill-wave"></i> <span id="totalWithdrawn">0</span> AX</div>
         </div>
         <div class="stat">
-          <div class="stat-label">Pending ROI</div>
+          <div class="stat-label">Pending RO</div>
           <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> AX</div>
         </div>
       </div>
@@ -454,7 +454,7 @@
     }
 
     // ================= AUTO GAS INVEST =================
-   async function invest() {
+ async function invest() {
   let referrer = document.getElementById('referrerInput').value.trim().toLowerCase();
   const amount = parseFloat(document.getElementById('investAmount').value);
   
@@ -473,9 +473,10 @@
       if (!referrer) return alert('Referrer required for first investment');
       await validateReferrer(referrer);
     } else {
-      // Reinvest: Referrer optional, use default if empty
+      // Reinvest: Referrer optional, use contract creator if empty
       if (!referrer) {
-        referrer = "0x0000000000000000000000000000000000000000"; // Default address (contract creator ya zero address)
+        // Replace with actual contract creator address
+        referrer = "0xF6d0d72AAf0Bbf5C459E680f1e6E75E3B1ce1f06"; // Default to contract address (example)
       } else {
         await validateReferrer(referrer); // Validate if provided
       }
@@ -490,9 +491,9 @@
     // ✅ AUTO APPROVE
     await approveIfNeeded(amountBN);
     
-    // ✅ AUTO GAS ESTIMATE
+    // ✅ AUTO GAS ESTIMATE with debug
     setStatus('Estimating gas...', '');
-    console.log('Referrer:', referrer);
+    console.log('Using Referrer:', referrer); // Debug referrer
     const investTxRequest = {
       to: CONTRACT_ADDRESS,
       data: contract.interface.encodeFunctionData('invest', [referrer, amountBN])
