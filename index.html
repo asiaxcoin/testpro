@@ -98,7 +98,7 @@
     
     /* Timer */
     .timer-card {
-      background: linear-gradient(135deg, rgba(192,192,192,0.1), rgba(169,169,169,0.1));  
+      background: linear-gradient(135deg, rgba(192,192,192,0.1), rgba(169,169,0.1));  
       border: 1px solid #C0C0C0;  
       animation: pulse-timer 2s infinite;
     }
@@ -275,7 +275,8 @@
       "function userBasic(address) view returns(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)",
       "function userWallet(address) view returns(uint256,uint256,uint256)",
       "function totalUsers() view returns(uint256)",
-      "function calculatePendingROI(address) view returns(uint256)"
+      "function calculatePendingROI(address) view returns(uint256)",
+      "function creator() view returns (address)" // Added creator function
     ];
     
     const TOKEN_ABI = [
@@ -345,8 +346,8 @@
         DECIMALS = await tokenContract.decimals();
         
         const addr = await signer.getAddress();
-        document.getElementById('userAddress').textContent = shortAddr(addr);
-        document.getElementById('connectLabel').textContent = 'Connected';document.getElementById('connectBtn').classList.remove('pulse');
+        document.getElementById('userAddress').textContent = shortAddr(addr);document.getElementById('connectLabel').textContent = 'Connected';
+        document.getElementById('connectBtn').classList.remove('pulse');
         
         loadData();
         startAutoRefresh();
@@ -470,13 +471,16 @@
         
         // First-time: Referrer mandatory
         if (isFirst) {
-          if (!referrer) return alert('Referrer required for first investment');
+          if (!referrer || referrer === '') return alert('Referrer required for first investment');
+          referrer = ethers.utils.getAddress(referrer); // Ensure checksum
           await validateReferrer(referrer);
         } else {
-          // Reinvest: Referrer optional, use zero address if empty
+          // Reinvest: Referrer optional, fallback to creator
           if (!referrer || referrer === '') {
-            referrer = ethers.constants.AddressZero; // 0x0000000000000000000000000000000000000000
+            referrer = await contract.creator(); // Use contract creator as fallback
+            console.log('Reinvest: Using creator as referrer:', referrer);
           } else {
+            referrer = ethers.utils.getAddress(referrer); // Ensure checksum
             await validateReferrer(referrer);
           }
         }
@@ -490,14 +494,20 @@
         // ✅ AUTO APPROVE
         await approveIfNeeded(amountBN);
         
-        // ✅ AUTO GAS ESTIMATE
+        // ✅ AUTO GAS ESTIMATE with debug
         setStatus('Estimating gas...', '');
-        console.log('Using referrer:', referrer);
+        console.log('Final referrer:', referrer);
         const investTxRequest = {
           to: CONTRACT_ADDRESS,
           data: contract.interface.encodeFunctionData('invest', [referrer, amountBN])
         };
-        const estimatedGas = await provider.estimateGas(investTxRequest);
+        let estimatedGas;
+        try {
+          estimatedGas = await provider.estimateGas(investTxRequest);
+        } catch (gasErr) {
+          console.error('Gas estimation failed:', gasErr);
+          throw new Error('Gas estimation failed: ' + gasErr.message);
+        }
         const gasLimit = estimatedGas.mul(120).div(100); // 20% buffer
         const feeData = await provider.getFeeData();
         
@@ -515,7 +525,7 @@
         loadData();
         if (isFirst) document.getElementById('referrerInput').value = ''; // Clear only on first invest
       } catch (err) {
-        console.error('Invest error:', err);
+        console.error('Invest error details:', err);
         setStatus('Investment failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('investBtn', false);
@@ -526,8 +536,7 @@
       try {
         setStatus('Withdrawing...', '');
         const estimatedGas = await contract.estimateGas.withdraw();
-        const gasLimit = estimatedGas.mul(120).div(100);
-        const feeData = await provider.getFeeData();
+        const gasLimit = estimatedGas.mul(120).div(100);const feeData = await provider.getFeeData();
         const tx = await contract.withdraw({ 
           gasLimit: gasLimit,
           maxFeePerGas: feeData.maxFeePerGas,
@@ -541,7 +550,9 @@
         setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('withdrawBtn', false);
-    }async function claimPools() {
+    }
+
+    async function claimPools() {
       disableBtn('claimPoolsBtn', true);
       try {
         setStatus('Claiming pools...', '');
@@ -625,8 +636,7 @@
         }
       });
 
-      document.getElementById('shareBtn').addEventListener('click', async () => {
-        if (!signer) return alert('Connect wallet first');
+      document.getElementById('shareBtn').addEventListener('click', async () => {if (!signer) return alert('Connect wallet first');
         try {
           const addr = await signer.getAddress();
           const url = `${window.location.origin}${window.location.pathname}?ref=${addr}`;
@@ -639,7 +649,8 @@
         } catch (err) { alert('Share failed'); }
       });
 
-      document.getElementById('connectBtn').onclick = connectWallet;document.getElementById('investBtn').onclick = invest;
+      document.getElementById('connectBtn').onclick = connectWallet;
+      document.getElementById('investBtn').onclick = invest;
       document.getElementById('withdrawBtn').onclick = withdraw;
       document.getElementById('claimPoolsBtn').onclick = claimPools;
       document.getElementById('walletWithdrawBtn').onclick = walletWithdraw;
