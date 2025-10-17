@@ -171,7 +171,7 @@
           <div class="stat-label">Total Income</div><div class="stat-value"><i class="fas fa-money-bill-wave"></i> <span id="totalWithdrawn">0</span> AX</div>
         </div>
         <div class="stat">
-          <div class="stat-label">Pending RO</div>
+          <div class="stat-label">Pending ROI</div>
           <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> AX</div>
         </div>
       </div>
@@ -447,80 +447,80 @@
       }
     }// ================= REFERRAL VALIDATION =================
     async function validateReferrer(refAddr) {
-      if (!ethers.utils.isAddress(refAddr)) throw new Error('Invalid address');
+      if (!ethers.utils.isAddress(refAddr)) throw new Error('Invalid address format');
       const basic = await contract.userBasic(refAddr);
       if (basic[2].eq(0)) throw new Error('Referrer not registered');
       return true;
     }
 
-    // ================= AUTO GAS INVEST =================
- async function invest() {
-  let referrer = document.getElementById('referrerInput').value.trim().toLowerCase();
-  const amount = parseFloat(document.getElementById('investAmount').value);
-  
-  if (amount < 10) return alert('Min 10 AX');
-  if (amount % 10 !== 0) return alert('Multiple of 10');
-  disableBtn('investBtn', true);
-  setStatus('Validating...', '');
-  
-  try {
-    const addr = await signer.getAddress();
-    const basic = await contract.userBasic(addr);
-    const isFirst = basic[2].eq(0); // First investment check
-    
-    // First-time: Referrer mandatory
-    if (isFirst) {
-      if (!referrer) return alert('Referrer required for first investment');
-      await validateReferrer(referrer);
-    } else {
-      // Reinvest: Referrer optional, use contract creator if empty
-      if (!referrer) {
-        // Replace with actual contract creator address
-        referrer = "0xF6d0d72AAf0Bbf5C459E680f1e6E75E3B1ce1f06"; // Default to contract address (example)
-      } else {
-        await validateReferrer(referrer); // Validate if provided
+    // ================= AUTO GAS INVEST WITH REINVEST LOGIC =================
+    async function invest() {
+      let referrer = document.getElementById('referrerInput').value.trim().toLowerCase();
+      const amount = parseFloat(document.getElementById('investAmount').value);
+      
+      if (amount < 10) return alert('Min 10 AX');
+      if (amount % 10 !== 0) return alert('Multiple of 10');
+      disableBtn('investBtn', true);
+      setStatus('Validating...', '');
+      
+      try {
+        const addr = await signer.getAddress();
+        const basic = await contract.userBasic(addr);
+        const isFirst = basic[2].eq(0); // First investment check
+        
+        // First-time: Referrer mandatory
+        if (isFirst) {
+          if (!referrer) return alert('Referrer required for first investment');
+          await validateReferrer(referrer);
+        } else {
+          // Reinvest: Referrer optional, use zero address if empty
+          if (!referrer || referrer === '') {
+            referrer = ethers.constants.AddressZero; // 0x0000000000000000000000000000000000000000
+          } else {
+            await validateReferrer(referrer);
+          }
+        }
+        
+        const bal = await tokenContract.balanceOf(addr);
+        const amountBN = ethers.utils.parseUnits(amount.toString(), DECIMALS);
+        if (bal.lt(amountBN)) throw new Error('Insufficient balance');
+        
+        if (isFirst && amount < 120) throw new Error('First investment: Min 120 AX');
+        
+        // ✅ AUTO APPROVE
+        await approveIfNeeded(amountBN);
+        
+        // ✅ AUTO GAS ESTIMATE
+        setStatus('Estimating gas...', '');
+        console.log('Using referrer:', referrer);
+        const investTxRequest = {
+          to: CONTRACT_ADDRESS,
+          data: contract.interface.encodeFunctionData('invest', [referrer, amountBN])
+        };
+        const estimatedGas = await provider.estimateGas(investTxRequest);
+        const gasLimit = estimatedGas.mul(120).div(100); // 20% buffer
+        const feeData = await provider.getFeeData();
+        
+        setStatus('Investing...', '');
+        const tx = await contract.invest(referrer, amountBN, {
+          gasLimit: gasLimit,
+          maxFeePerGas: feeData.maxFeePerGas,
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
+        });
+        
+        setStatus(`Tx: ${tx.hash.slice(-6)}`, 'success');
+        await tx.wait();
+        
+        setStatus('✅ Investment successful! 🎉', 'success');
+        loadData();
+        if (isFirst) document.getElementById('referrerInput').value = ''; // Clear only on first invest
+      } catch (err) {
+        console.error('Invest error:', err);
+        setStatus('Investment failed: ' + (err.reason || err.message), 'error');
       }
+      disableBtn('investBtn', false);
     }
-    
-    const bal = await tokenContract.balanceOf(addr);
-    const amountBN = ethers.utils.parseUnits(amount.toString(), DECIMALS);
-    if (bal.lt(amountBN)) throw new Error('Insufficient balance');
-    
-    if (isFirst && amount < 120) throw new Error('First investment: Min 120 AX');
-    
-    // ✅ AUTO APPROVE
-    await approveIfNeeded(amountBN);
-    
-    // ✅ AUTO GAS ESTIMATE with debug
-    setStatus('Estimating gas...', '');
-    console.log('Using Referrer:', referrer); // Debug referrer
-    const investTxRequest = {
-      to: CONTRACT_ADDRESS,
-      data: contract.interface.encodeFunctionData('invest', [referrer, amountBN])
-    };
-    const estimatedGas = await provider.estimateGas(investTxRequest);
-    const gasLimit = estimatedGas.mul(120).div(100);
-    const feeData = await provider.getFeeData();
-    
-    setStatus('Investing...', '');
-    const tx = await contract.invest(referrer, amountBN, {
-      gasLimit: gasLimit,
-      maxFeePerGas: feeData.maxFeePerGas,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
-    });
-    
-    setStatus(`Tx: ${tx.hash.slice(-6)}`, 'success');
-    await tx.wait();
-    
-    setStatus('✅ Investment successful! 🎉', 'success');
-    loadData();
-    if (isFirst) document.getElementById('referrerInput').value = ''; // Clear only on first invest
-  } catch (err) {
-    console.error('Invest error:', err);
-    setStatus('Investment failed: ' + (err.reason || err.message), 'error');
-  }
-  disableBtn('investBtn', false);
-}
+
     async function withdraw() {
       disableBtn('withdrawBtn', true);
       try {
@@ -541,9 +541,7 @@
         setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('withdrawBtn', false);
-    }
-
-    async function claimPools() {
+    }async function claimPools() {
       disableBtn('claimPoolsBtn', true);
       try {
         setStatus('Claiming pools...', '');
@@ -553,7 +551,8 @@
         const tx = await contract.claimPoolRewards({ 
           gasLimit: gasLimit,
           maxFeePerGas: feeData.maxFeePerGas,
-          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas});
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
+        });
         await tx.wait();
         setStatus('✅ Pools claimed!', 'success');
         loadData();
@@ -640,15 +639,16 @@
         } catch (err) { alert('Share failed'); }
       });
 
-      document.getElementById('connectBtn').onclick = connectWallet;
-      document.getElementById('investBtn').onclick = invest;
+      document.getElementById('connectBtn').onclick = connectWallet;document.getElementById('investBtn').onclick = invest;
       document.getElementById('withdrawBtn').onclick = withdraw;
       document.getElementById('claimPoolsBtn').onclick = claimPools;
       document.getElementById('walletWithdrawBtn').onclick = walletWithdraw;
       document.getElementById('claimIncomeBtn').onclick = claimIncome;
       document.getElementById('maxBtn').onclick = setMax;
       document.getElementById('refreshBtn').onclick = loadData;
-    }// ================= BOTTOM NAVIGATION =================
+    }
+
+    // ================= BOTTOM NAVIGATION =================
     function setupBottomNav() {
       document.getElementById('navHome').onclick = () => window.location.href = 'index.html';
       document.getElementById('navInvest').onclick = () => window.location.href = 'axmenu.html';
