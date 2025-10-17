@@ -171,7 +171,7 @@
           <div class="stat-label">Total Income</div><div class="stat-value"><i class="fas fa-money-bill-wave"></i> <span id="totalWithdrawn">0</span> AX</div>
         </div>
         <div class="stat">
-          <div class="stat-label">Pending ROI</div>
+          <div class="stat-label">Pending </div>
           <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> AX</div>
         </div>
       </div>
@@ -213,7 +213,7 @@
     <!-- Invest -->
     <div class="card-app">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <div><div class="small-text">Invest</div><div style="font-weight:700">Join Network</div></div>
+        <div><div class="small-text">Invest</div><div style="font-weight:700" id="investTitle">Join Network</div></div>
         <i class="fas fa-hand-holding-usd" style="font-size:1.5rem;color:var(--accent)"></i>
       </div>
       <div class="mb-3">
@@ -265,18 +265,19 @@
     const CONTRACT_ADDRESS = "0xF6d0d72AAf0Bbf5C459E680f1e6E75E3B1ce1f06";
     const TOKEN_ADDRESS = "0xe36b5223d488322fac2ddda937e5ab226e83fbbd";
     
+    // ✅ FIXED COMPLETE ABI
     const ABI = [
       "function invest(address _referrer,uint256 _amount) external",
       "function withdraw() external",
       "function claimPoolRewards() external",
       "function WalletWithdraw(uint256 _amount) external",
+      "function creator() view returns(address)",
       "function getUserIncome(address) view returns(uint256,uint256,uint256,uint256,uint256)",
       "function getUserNetwork(address) view returns(uint256,uint256,bool,bool,bool)",
       "function userBasic(address) view returns(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)",
       "function userWallet(address) view returns(uint256,uint256,uint256)",
       "function totalUsers() view returns(uint256)",
-      "function calculatePendingROI(address) view returns(uint256)",
-      "function creator() view returns (address)" // Added creator function
+      "function calculatePendingROI(address) view returns(uint256)"
     ];
     
     const TOKEN_ABI = [
@@ -287,7 +288,7 @@
     ];
 
     // ================= STATE =================
-    let provider, signer, contract, tokenContract, DECIMALS = 18;
+    let provider, signer, contract, tokenContract, DECIMALS = 18, CREATOR_ADDRESS;
     let autoRefresh, timerInterval;
     const REFRESH_INTERVAL = 20000;
     const SILVER_DEADLINE = 30 * 24 * 60 * 60 * 1000;
@@ -300,7 +301,10 @@
       el.textContent = text;
       el.className = `status ${type}`;
     }
-    function disableBtn(id, disabled) { document.getElementById(id).disabled = disabled; }
+    function disableBtn(id, disabled) { 
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = disabled; 
+    }
 
     // ================= FIXED WALLET CONNECT =================
     async function connectWallet() {
@@ -343,10 +347,13 @@
         
         contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
         tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-        DECIMALS = await tokenContract.decimals();
+        DECIMALS = await tokenContract.decimals();// ✅ FIXED: GET CREATOR ADDRESS
+        CREATOR_ADDRESS = await contract.creator();
+        console.log('✅ Creator Address:', CREATOR_ADDRESS);
         
         const addr = await signer.getAddress();
-        document.getElementById('userAddress').textContent = shortAddr(addr);document.getElementById('connectLabel').textContent = 'Connected';
+        document.getElementById('userAddress').textContent = shortAddr(addr);
+        document.getElementById('connectLabel').textContent = 'Connected';
         document.getElementById('connectBtn').classList.remove('pulse');
         
         loadData();
@@ -381,6 +388,11 @@
         document.getElementById('poolRewards').textContent = formatNum(income[3]);
         document.getElementById('totalTeam').textContent = `Team: ${network[1]}`;
         
+        // ✅ FIXED: UPDATE INVEST TITLE
+        const isFirst = basic[2].eq(0);
+        document.getElementById('investTitle').textContent = isFirst ? 'Join Network' : 'Reinvest';
+        document.getElementById('referrerInput').placeholder = isFirst ? '🔗 Referrer Address (Required)' : '🔗 Referrer (Optional)';
+        
         // ✅ FIXED SILVER TIMER
         if (basic[2] > 0 && !network[2]) {
           const investTime = Number(basic[2]) * 1000;
@@ -400,6 +412,7 @@
     function showTimer(seconds) {
       const card = document.getElementById('timerCard');
       const display = document.getElementById('timerDisplay');
+      if (timerInterval) clearInterval(timerInterval);
       card.style.display = 'block';
       
       function updateTimer() {
@@ -412,7 +425,7 @@
         const hours = Math.floor((seconds % 86400) / 3600);
         const mins = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
-        display.textContent = days + "d " + hours.toString().padStart(2,'0') + ":" + mins.toString().padStart(2,'0') + ":" + secs.toString().padStart(2,'0');
+        display.textContent = `${days}d ${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
         seconds--;
       }
       timerInterval = setInterval(updateTimer, 1000);
@@ -423,64 +436,60 @@
     async function approveIfNeeded(amountBN) {
       try {
         const user = await signer.getAddress();
-        const allowance = await tokenContract.allowance(user, CONTRACT_ADDRESS);
-        if (allowance.gte(amountBN)) return null;
+        const allowance = await tokenContract.allowance(user, CONTRACT_ADDRESS);if (allowance.gte(amountBN)) return null;
         
-        setStatus('Approving tokens...', '');
-        const approveTxRequest = {
-          to: TOKEN_ADDRESS,
-          data: tokenContract.interface.encodeFunctionData('approve', [CONTRACT_ADDRESS, amountBN])
-        };
-        const estimatedGas = await provider.estimateGas(approveTxRequest);
-        const gasLimit = estimatedGas.mul(120).div(100);
-        const feeData = await provider.getFeeData();
-        
-        const tx = await tokenContract.approve(CONTRACT_ADDRESS, amountBN, { 
-          gasLimit: gasLimit,
-          maxFeePerGas: feeData.maxFeePerGas,
-          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
-        });
+        setStatus('🔓 Approving tokens...', '');
+        const tx = await tokenContract.approve(CONTRACT_ADDRESS, amountBN);
         await tx.wait();
-        setStatus('✅ Approved!', '');
+        setStatus('✅ Approved!', 'success');
         return tx;
       } catch (err) {
         throw new Error('Approval failed: ' + (err.reason || err.message));
       }
-    }// ================= REFERRAL VALIDATION =================
-    async function validateReferrer(refAddr) {
-      if (!ethers.utils.isAddress(refAddr)) throw new Error('Invalid address format');
-      const basic = await contract.userBasic(refAddr);
-      if (basic[2].eq(0)) throw new Error('Referrer not registered');
-      return true;
     }
 
-    // ================= AUTO GAS INVEST WITH REINVEST LOGIC =================
+    // ================= FIXED REFERRAL VALIDATION =================
+    async function validateReferrer(refAddr) {
+      if (!refAddr || refAddr === '0x0000000000000000000000000000000000000000') return true;
+      if (!ethers.utils.isAddress(refAddr)) throw new Error('Invalid address format');
+      try {
+        const basic = await contract.userBasic(refAddr);
+        if (basic[2].eq(0)) throw new Error('Referrer not registered');
+        return true;
+      } catch {
+        throw new Error('Invalid referrer');
+      }
+    }
+
+    // ================= FIXED AUTO GAS INVEST WITH REINVEST LOGIC =================
     async function invest() {
-      let referrer = document.getElementById('referrerInput').value.trim().toLowerCase();
-      const amount = parseFloat(document.getElementById('investAmount').value);
+      let referrer = document.getElementById('referrerInput').value.trim();
+      const amountInput = document.getElementById('investAmount').value;
+      const amount = parseFloat(amountInput);
       
-      if (amount < 10) return alert('Min 10 AX');
-      if (amount % 10 !== 0) return alert('Multiple of 10');
+      if (!amountInput || amount < 10) return alert('Min 10 AX');
+      if (amount % 10 !== 0) return alert('Multiple of 10 only');
       disableBtn('investBtn', true);
       setStatus('Validating...', '');
       
       try {
         const addr = await signer.getAddress();
         const basic = await contract.userBasic(addr);
-        const isFirst = basic[2].eq(0); // First investment check
+        const isFirst = basic[2].eq(0);
         
-        // First-time: Referrer mandatory
+        // ✅ FIXED REINVEST LOGIC
         if (isFirst) {
-          if (!referrer || referrer === '') return alert('Referrer required for first investment');
-          referrer = ethers.utils.getAddress(referrer); // Ensure checksum
+          if (!referrer) return alert('Referrer required for first investment');
+          referrer = ethers.utils.getAddress(referrer);
           await validateReferrer(referrer);
+          if (amount < 120) throw new Error('First investment: Min 120 AX');
         } else {
-          // Reinvest: Referrer optional, fallback to creator
+          // REINVEST: Optional referrer, fallback to creator
           if (!referrer || referrer === '') {
-            referrer = await contract.creator(); // Use contract creator as fallback
-            console.log('Reinvest: Using creator as referrer:', referrer);
+            referrer = CREATOR_ADDRESS;
+            console.log('✅ Reinvest: Using Creator:', shortAddr(referrer));
           } else {
-            referrer = ethers.utils.getAddress(referrer); // Ensure checksum
+            referrer = ethers.utils.getAddress(referrer);
             await validateReferrer(referrer);
           }
         }
@@ -489,29 +498,21 @@
         const amountBN = ethers.utils.parseUnits(amount.toString(), DECIMALS);
         if (bal.lt(amountBN)) throw new Error('Insufficient balance');
         
-        if (isFirst && amount < 120) throw new Error('First investment: Min 120 AX');
-        
         // ✅ AUTO APPROVE
         await approveIfNeeded(amountBN);
         
-        // ✅ AUTO GAS ESTIMATE with debug
-        setStatus('Estimating gas...', '');
-        console.log('Final referrer:', referrer);
+        // ✅ FIXED GAS ESTIMATE
+        setStatus('⛽ Estimating gas...', '');
         const investTxRequest = {
           to: CONTRACT_ADDRESS,
           data: contract.interface.encodeFunctionData('invest', [referrer, amountBN])
         };
-        let estimatedGas;
-        try {
-          estimatedGas = await provider.estimateGas(investTxRequest);
-        } catch (gasErr) {
-          console.error('Gas estimation failed:', gasErr);
-          throw new Error('Gas estimation failed: ' + gasErr.message);
-        }
-        const gasLimit = estimatedGas.mul(120).div(100); // 20% buffer
+        let estimatedGas = await provider.estimateGas(investTxRequest);
+        const gasLimit = estimatedGas.mul(120).div(100);
         const feeData = await provider.getFeeData();
         
-        setStatus('Investing...', '');
+        setStatus('🚀 Investing...', '');
+        console.log('📝 Final: Referrer=', shortAddr(referrer), 'Amount=', amount);
         const tx = await contract.invest(referrer, amountBN, {
           gasLimit: gasLimit,
           maxFeePerGas: feeData.maxFeePerGas,
@@ -523,20 +524,22 @@
         
         setStatus('✅ Investment successful! 🎉', 'success');
         loadData();
-        if (isFirst) document.getElementById('referrerInput').value = ''; // Clear only on first invest
+        if (isFirst) document.getElementById('referrerInput').value = '';
+        
       } catch (err) {
-        console.error('Invest error details:', err);
-        setStatus('Investment failed: ' + (err.reason || err.message), 'error');
+        console.error('Invest error:', err);
+        setStatus('❌ ' + (err.reason || err.message), 'error');
+        alert('Error: ' + (err.reason || err.message));
       }
       disableBtn('investBtn', false);
-    }
-
+    }// ✅ FIXED WITHDRAW
     async function withdraw() {
       disableBtn('withdrawBtn', true);
       try {
-        setStatus('Withdrawing...', '');
-        const estimatedGas = await contract.estimateGas.withdraw();
-        const gasLimit = estimatedGas.mul(120).div(100);const feeData = await provider.getFeeData();
+        setStatus('💸 Withdrawing...', '');
+        let estimatedGas = await contract.estimateGas.withdraw();
+        const gasLimit = estimatedGas.mul(120).div(100);
+        const feeData = await provider.getFeeData();
         const tx = await contract.withdraw({ 
           gasLimit: gasLimit,
           maxFeePerGas: feeData.maxFeePerGas,
@@ -547,16 +550,17 @@
         loadData();
       } catch (err) {
         console.error('Withdraw error:', err);
-        setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
+        setStatus('❌ ' + (err.reason || err.message), 'error');
       }
       disableBtn('withdrawBtn', false);
     }
 
+    // ✅ FIXED CLAIM POOLS
     async function claimPools() {
       disableBtn('claimPoolsBtn', true);
       try {
-        setStatus('Claiming pools...', '');
-        const estimatedGas = await contract.estimateGas.claimPoolRewards();
+        setStatus('🏆 Claiming pools...', '');
+        let estimatedGas = await contract.estimateGas.claimPoolRewards();
         const gasLimit = estimatedGas.mul(120).div(100);
         const feeData = await provider.getFeeData();
         const tx = await contract.claimPoolRewards({ 
@@ -569,20 +573,21 @@
         loadData();
       } catch (err) {
         console.error('Claim pools error:', err);
-        setStatus('Claim failed: ' + (err.reason || err.message), 'error');
+        setStatus('❌ ' + (err.reason || err.message), 'error');
       }
       disableBtn('claimPoolsBtn', false);
     }
 
+    // ✅ FIXED WALLET WITHDRAW
     async function walletWithdraw() {
       const amount = parseFloat(document.getElementById('withdrawAmt').value);
       if (amount < 10 || amount > 1000) return alert('10-1000 AX only');
       
       disableBtn('walletWithdrawBtn', true);
       try {
-        setStatus('Fast withdraw...', '');
+        setStatus('⚡ Fast withdraw...', '');
         const amountBN = ethers.utils.parseUnits(amount.toString(), DECIMALS);
-        const estimatedGas = await contract.estimateGas.WalletWithdraw(amountBN);
+        let estimatedGas = await contract.estimateGas.WalletWithdraw(amountBN);
         const gasLimit = estimatedGas.mul(120).div(100);
         const feeData = await provider.getFeeData();
         const tx = await contract.WalletWithdraw(amountBN, {
@@ -595,13 +600,12 @@
         loadData();
       } catch (err) {
         console.error('Wallet withdraw error:', err);
-        setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
+        setStatus('❌ ' + (err.reason || err.message), 'error');
       }
       disableBtn('walletWithdrawBtn', false);
     }
 
     async function claimIncome() { await withdraw(); }
-
     async function setMax() {
       const addr = await signer.getAddress();
       const bal = await tokenContract.balanceOf(addr);
@@ -619,24 +623,26 @@
       const ref = urlParams.get('ref');
       if (ref) document.getElementById('referrerInput').value = ref;
 
+      // ✅ FIXED REFERRAL VALIDATION
       document.getElementById('referrerInput').addEventListener('input', async (e) => {
         const status = document.getElementById('referrerStatus');
-        if (!e.target.value) {
-          status.textContent = 'Referrer required';
-          status.style.color = 'var(--error)';
-          return;
-        }
+        const value = e.target.value.trim();
+        if (!value) {
+          status.textContent = 'Optional for reinvest';
+          status.style.color = 'var(--muted)';
+          return;}
         try {
-          await validateReferrer(e.target.value);
+          await validateReferrer(value);
           status.textContent = '✓ Valid referrer';
           status.style.color = 'var(--success)';
-        } catch {
-          status.textContent = '✗ Invalid referrer';
+        } catch (err) {
+          status.textContent = '✗ ' + err.message;
           status.style.color = 'var(--error)';
         }
       });
 
-      document.getElementById('shareBtn').addEventListener('click', async () => {if (!signer) return alert('Connect wallet first');
+      document.getElementById('shareBtn').addEventListener('click', async () => {
+        if (!signer) return alert('Connect wallet first');
         try {
           const addr = await signer.getAddress();
           const url = `${window.location.origin}${window.location.pathname}?ref=${addr}`;
