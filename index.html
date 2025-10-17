@@ -171,7 +171,7 @@
           <div class="stat-label">Total Income</div><div class="stat-value"><i class="fas fa-money-bill-wave"></i> <span id="totalWithdrawn">0</span> AX</div>
         </div>
         <div class="stat">
-          <div class="stat-label">Pending ROI</div>
+          <div class="stat-label">Pending RO</div>
           <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> AX</div>
         </div>
       </div>
@@ -374,7 +374,7 @@
         document.getElementById('totalInvest').textContent = formatNum(basic[1]);
         document.getElementById('walletBal').textContent = formatNum(wallet[0]);
         document.getElementById('totalWithdrawn').textContent = formatNum(basic[4]);
-        document.getElementById('pendingROI').textContent = formatNum(income[0]);
+        document.getElementById('pendingROI').textContent = formatNum(await contract.calculatePendingROI(addr));
         document.getElementById('sponsorInc').textContent = formatNum(income[1]);
         document.getElementById('genInc').textContent = formatNum(income[2]);
         document.getElementById('poolRewards').textContent = formatNum(income[3]);
@@ -391,7 +391,7 @@
         setStatus('✅ Data loaded', 'success');
       } catch (err) {
         console.error('Load error:', err);
-        setStatus('Data load failed', 'error');
+        setStatus('Data load failed: ' + err.message, 'error');
       }
     }
 
@@ -432,11 +432,12 @@
         };
         const estimatedGas = await provider.estimateGas(approveTxRequest);
         const gasLimit = estimatedGas.mul(120).div(100);
+        const feeData = await provider.getFeeData();
         
         const tx = await tokenContract.approve(CONTRACT_ADDRESS, amountBN, { 
           gasLimit: gasLimit,
-          maxFeePerGas: (await provider.getFeeData()).maxFeePerGas,
-          maxPriorityFeePerGas: (await provider.getFeeData()).maxPriorityFeePerGas
+          maxFeePerGas: feeData.maxFeePerGas,
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
         });
         await tx.wait();
         setStatus('✅ Approved!', '');
@@ -501,7 +502,8 @@
         document.getElementById('investAmount').value = '';
         
       } catch (err) {
-        setStatus(err.message, 'error');
+        console.error('Invest error:', err);
+        setStatus('Investment failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('investBtn', false);
     }
@@ -522,7 +524,8 @@
         setStatus('✅ Withdrawn successfully!', 'success');
         loadData();
       } catch (err) {
-        setStatus(err.reason || err.message, 'error');
+        console.error('Withdraw error:', err);
+        setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('withdrawBtn', false);
     }
@@ -537,16 +540,18 @@
         const tx = await contract.claimPoolRewards({ 
           gasLimit: gasLimit,
           maxFeePerGas: feeData.maxFeePerGas,
-          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
-        });
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas});
         await tx.wait();
         setStatus('✅ Pools claimed!', 'success');
         loadData();
       } catch (err) {
-        setStatus(err.reason || err.message, 'error');
+        console.error('Claim pools error:', err);
+        setStatus('Claim failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('claimPoolsBtn', false);
-    }async function walletWithdraw() {
+    }
+
+    async function walletWithdraw() {
       const amount = parseFloat(document.getElementById('withdrawAmt').value);
       if (amount < 10 || amount > 1000) return alert('10-1000 AX only');
       
@@ -566,7 +571,8 @@
         setStatus('✅ Withdrawn to wallet!', 'success');
         loadData();
       } catch (err) {
-        setStatus(err.reason || err.message, 'error');
+        console.error('Wallet withdraw error:', err);
+        setStatus('Withdrawal failed: ' + (err.reason || err.message), 'error');
       }
       disableBtn('walletWithdrawBtn', false);
     }
@@ -629,15 +635,15 @@
       document.getElementById('claimIncomeBtn').onclick = claimIncome;
       document.getElementById('maxBtn').onclick = setMax;
       document.getElementById('refreshBtn').onclick = loadData;
-    }
-
-    // ================= BOTTOM NAVIGATION =================
+    }// ================= BOTTOM NAVIGATION =================
     function setupBottomNav() {
       document.getElementById('navHome').onclick = () => window.location.href = 'index.html';
       document.getElementById('navInvest').onclick = () => window.location.href = 'axmenu.html';
       document.getElementById('navPools').onclick = () => window.location.href = 'axpro.html';
       document.getElementById('navTeam').onclick = () => window.location.href = 'axpro.html';
-    }// ================= INIT =================
+    }
+
+    // ================= INIT =================
     window.addEventListener('load', () => {
       if (window.ethereum) {
         setStatus('✅ MetaMask Ready! Click Connect', '');
