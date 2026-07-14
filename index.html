@@ -479,7 +479,7 @@
 
     async function walletWithdraw() {
       const amount = parseFloat(document.getElementById('withdrawAmt').value);
-      if (amount < 10 || amount > 1000) return alert('10-1000 AX only');
+      if (amount < 0.01 || amount > 1) return alert('0.01-1 AX only');
       
       disableBtn('walletWithdrawBtn', true);
       try {
