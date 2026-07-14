@@ -393,7 +393,7 @@
       const amount = parseFloat(amountInput);
       
       if (!amountInput || amount < 0.01) return alert('Min 0.01 AX');
-      if (amount % 10 !== 0) return alert('Multiple of 10 only');
+      if (amount % 0.01 !== 0) return alert('Multiple of 0.01 only');
       disableBtn('investBtn', true);
       setStatus('Validating...', '');
       
@@ -409,7 +409,7 @@
           if (!inputReferrer) return alert('Referrer required for first investment');
           referrer = ethers.utils.getAddress(inputReferrer);
           await validateReferrer(referrer);
-          if (amount < 120) throw new Error('First investment: Min 120 AX');
+          if (amount < 0.01) throw new Error('First investment: Min 0.01 AX');
         } else {
           // REINVEST: Use HARDCODED CREATOR or input
           if (!inputReferrer || inputReferrer === '') {
