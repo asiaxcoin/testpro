@@ -392,7 +392,7 @@
       const amountInput = document.getElementById('investAmount').value;
       const amount = parseFloat(amountInput);
       
-      if (!amountInput || amount < 10) return alert('Min 10 AX');
+      if (!amountInput || amount < 0.01) return alert('Min 0.01 AX');
       if (amount % 10 !== 0) return alert('Multiple of 10 only');
       disableBtn('investBtn', true);
       setStatus('Validating...', '');
