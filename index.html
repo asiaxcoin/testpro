@@ -392,8 +392,9 @@
       const amountInput = document.getElementById('investAmount').value;
       const amount = parseFloat(amountInput);
       
-      if (!amountInput || amount < 0.01) return alert('Min 0.01 AX');
-      if (amount % 0.01 !== 0) return alert('Multiple of 0.01 only');
+      if (!amountInput || amount < 0.01) return alert('Min 0.01 AX')
+      if (Math.round(amount * 100) !== amount * 100) {return alert("Multiple of 0.01 only");
+    }
       disableBtn('investBtn', true);
       setStatus('Validating...', '');
       
