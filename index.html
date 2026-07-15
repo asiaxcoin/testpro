@@ -102,11 +102,11 @@
       <div class="stats-row">
         <div class="stat">
           <div class="stat-label">Total Invest</div>
-          <div class="stat-value"><i class="fas fa-coins"></i> <span id="totalInvest">0</span> AX</div>
+          <div class="stat-value"><i class="fas fa-coins"></i> <span id="totalInvest">0</span> PRO</div>
         </div>
         <div class="stat">
           <div class="stat-label">Wallet Bal</div>
-          <div class="stat-value"><i class="fas fa-wallet"></i> <span id="walletBal">0</span> AX</div>
+          <div class="stat-value"><i class="fas fa-wallet"></i> <span id="walletBal">0</span> PRO</div>
         </div>
       </div>
       
@@ -116,7 +116,7 @@
         </div>
         <div class="stat">
           <div class="stat-label">Pending ROI</div>
-          <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> AX</div>
+          <div class="stat-value"><i class="fas fa-chart-line"></i> <span id="pendingROI">0</span> PRO</div>
         </div>
       </div>
     </div>
@@ -126,14 +126,14 @@
       <div class="stats-row">
         <div class="stat">
           <div class="stat-label">Sponsor</div>
-          <div class="stat-value"><i class="fas fa-users"></i> <span id="sponsorInc">0</span> AX</div></div>
+          <div class="stat-value"><i class="fas fa-users"></i> <span id="sponsorInc">0</span> PRO</div></div>
         <div class="stat">
           <div class="stat-label">Generation</div>
-          <div class="stat-value"><i class="fas fa-network-wired"></i> <span id="genInc">0</span> AX</div>
+          <div class="stat-value"><i class="fas fa-network-wired"></i> <span id="genInc">0</span> PRO</div>
         </div>
         <div class="stat">
           <div class="stat-label">Pools</div>
-          <div class="stat-value"><i class="fas fa-trophy"></i> <span id="poolRewards">0</span> AX</div>
+          <div class="stat-value"><i class="fas fa-trophy"></i> <span id="poolRewards">0</span> PRO</div>
         </div>
       </div>
       <div class="d-flex gap-2 mt-3">
@@ -188,7 +188,7 @@
         <i class="fas fa-lightning-bolt" style="font-size:1.5rem;color:var(--success)"></i>
       </div>
       <div class="input-group">
-        <input id="withdrawAmt" type="number" class="form-control" placeholder="Amount (10-1000 AX)" />
+        <input id="withdrawAmt" type="number" class="form-control" placeholder="Amount (0.01-1 PRO)" />
         <button id="walletWithdrawBtn" class="btn btn-success">GO</button>
       </div>
     </div>
@@ -392,7 +392,7 @@
       const amountInput = document.getElementById('investAmount').value;
       const amount = parseFloat(amountInput);
       
-      if (!amountInput || amount < 0.01) return alert('Min 0.01 AX')
+      if (!amountInput || amount < 0.01) return alert('Min 0.01 PRO')
       if (Math.round(amount * 100) !== amount * 100) {return alert("Multiple of 0.01 only");
     }
       disableBtn('investBtn', true);
@@ -410,7 +410,7 @@
           if (!inputReferrer) return alert('Referrer required for first investment');
           referrer = ethers.utils.getAddress(inputReferrer);
           await validateReferrer(referrer);
-          if (amount < 0.01) throw new Error('First investment: Min 0.01 AX');
+          if (amount < 0.01) throw new Error('First investment: Min 0.01 PRO');
         } else {
           // REINVEST: Use HARDCODED CREATOR or input
           if (!inputReferrer || inputReferrer === '') {
@@ -479,7 +479,7 @@
 
     async function walletWithdraw() {
       const amount = parseFloat(document.getElementById('withdrawAmt').value);
-      if (amount < 0.01 || amount > 1) return alert('0.01-1 AX only');
+      if (amount < 0.01 || amount > 1) return alert('0.01-1 PRO only');
       
       disableBtn('walletWithdrawBtn', true);
       try {
