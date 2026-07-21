@@ -393,7 +393,7 @@
       const amount = parseFloat(amountInput);
       
       if (!amountInput || amount < 0.001) return alert('Min 0.001 PRO')
-      if (Math.round(amount * 100) !== amount * 100) {return alert("Multiple of 0.01 only");
+      if (Math.round(amount * 1000) !== amount * 1000) {return alert("Multiple of 0.001 only");
     }
       disableBtn('investBtn', true);
       setStatus('Validating...', '');
